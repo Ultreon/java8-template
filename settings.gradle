@@ -1,0 +1,11 @@
+rootProject.name = 'template'
+
+buildscript {
+    repositories {
+        mavenLocal()
+
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}

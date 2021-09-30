@@ -1,0 +1,135 @@
+//file:noinspection GroovyUnusedCatchParameter
+
+import java.nio.file.Files
+import java.nio.file.Paths
+
+import static java.nio.file.StandardOpenOption.CREATE
+import static java.nio.file.StandardOpenOption.WRITE
+
+apply plugin: 'maven'
+apply plugin: 'java'
+apply plugin: 'java-library'
+apply plugin: 'eclipse'
+apply plugin: 'maven-publish'
+
+String baseVersion = project.property("baseVersion").toString()
+String versionSuffix = project.property("versionSuffix").toString()
+
+if (projectName == "<<INSTERT_PROJECT_NAME>>") {
+    println("Set the project name before running project.")
+    System.exit(0)
+}
+
+final buildNumberPath = Paths.get(project.projectDir.absolutePath, "buildnumber.txt")
+
+// Read build number file.
+int buildNumber
+try {
+    buildNumber = Integer.valueOf(new String(Files.readAllBytes(buildNumberPath)))
+} catch (Throwable t) {
+    buildNumber = -1
+}
+
+// Advance build number.
+buildNumber++
+println("New buildnumber: " + buildNumber)
+
+// Write new build number.
+Files.write(buildNumberPath, buildNumber.toString().getBytes(), CREATE, WRITE)
+
+group 'com.ultreon'
+version baseVersion + '.' + buildNumber + "-" + versionSuffix
+archivesBaseName = "$projectName"
+
+println("Version: " + version)
+
+sourceCompatibility = targetCompatibility = 1.8
+
+compileJava {
+    sourceCompatibility "1.8"
+    targetCompatibility "1.8"
+}
+
+publishing {
+    repositories {
+
+    }
+
+    dependencies {
+
+    }
+
+    publications {
+        //noinspection GroovyAssignabilityCheck
+        gpr(MavenPublication) {
+            from(components.java)
+        }
+    }
+}
+
+repositories {
+    mavenLocal()
+
+    google()
+    mavenCentral()
+}
+
+configurations {
+    // configuration that holds jars to include in the jar
+    api {
+        canBeResolved true
+    }
+}
+
+dependencies {
+    implementation 'org.jetbrains:annotations:22.0.0'
+}
+
+// Example for how to get properties into the manifest for reading by the runtime..
+jar {
+    manifest {
+        attributes([
+                "Specification-Title": "Ultreon Commons",
+                "Specification-Vendor": "Ultreon Team",
+                "Specification-Version": project.version,
+                "Implementation-Title": project.name,
+                "Implementation-Version": "${version}",
+                "Implementation-Vendor" :"Ultreon Team",
+                "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+        ])
+    }
+    from {
+        configurations.api.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+task("uploadJars", dependsOn: "build") {
+    description = "uploads JARs"
+
+    if (project.hasProperty("local_maven") || project.hasProperty("sftp_maven")) {
+        apply plugin: 'maven'
+        uploadArchives {
+            repositories {
+                if (project.hasProperty("local_maven")) {
+                    //noinspection GrUnresolvedAccess
+                    mavenDeployer {
+                        //noinspection GrUnresolvedAccess
+                        repository(url: "file://${local_maven}")
+                    }
+                }
+                if (project.hasProperty("sftp_maven")) {
+                    repositories.mavenDeployer {
+                        configuration = configurations.deployerJars
+                        //noinspection GrUnresolvedAccess
+                        repository(url: "sftp://${sftp_maven}") {
+                            //noinspection GrUnresolvedAccess
+                            authentication(userName: "${sftp_username}", privateKey: "${sftp_key}")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+jar.finalizedBy('uploadJars')
