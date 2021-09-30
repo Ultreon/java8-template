@@ -1,13 +1,15 @@
+# Folders
 .idea/
 .gradle/
 build/
 out/
 bin/
-/cache/
-/tmp/
-/temp/
-/local/
+cache/
+tmp/
+temp/
+local/
 
+# File Types
 *.bin
 *.exe
 *.jar
@@ -17,3 +19,7 @@ bin/
 *.iso
 *.obj
 *.nbt
+
+# Force include
+!gradle/
+!src/

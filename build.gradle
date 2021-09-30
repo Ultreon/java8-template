@@ -3,56 +3,58 @@
 import java.nio.file.Files
 import java.nio.file.Paths
 
-import static java.nio.file.StandardOpenOption.CREATE
-import static java.nio.file.StandardOpenOption.WRITE
+import static java.nio.file.StandardOpenOption.*
 
-apply plugin: 'maven'
 apply plugin: 'java'
 apply plugin: 'java-library'
 apply plugin: 'eclipse'
 apply plugin: 'maven-publish'
 
+// Receive properties and make variables of them.
 String baseVersion = project.property("baseVersion").toString()
 String versionSuffix = project.property("versionSuffix").toString()
+String projectId = project.property("projectId").toString()
+String projectName = project.property("projectName").toString()
+String teamName = project.property("teamName").toString()
 
-if (projectName == "<<INSTERT_PROJECT_NAME>>") {
-    println("Set the project name before running project.")
+// Check project id.
+if (projectId == "<<INSTERT_PROJECT_NAME>>") {
+    println "Set the project name before running project."
     System.exit(0)
 }
 
-final buildNumberPath = Paths.get(project.projectDir.absolutePath, "buildnumber.txt")
-
-// Read build number file.
+// Project build numbering
+final buildNumberPath = Paths.get project.projectDir.absolutePath, "buildnumber.txt"
 int buildNumber
+
 try {
-    buildNumber = Integer.valueOf(new String(Files.readAllBytes(buildNumberPath)))
+    buildNumber = Integer.valueOf new String(Files.readAllBytes(buildNumberPath))
 } catch (Throwable t) {
     buildNumber = -1
 }
 
-// Advance build number.
 buildNumber++
-println("New buildnumber: " + buildNumber)
+println "New buildnumber: " + buildNumber
+Files.write buildNumberPath, buildNumber.toString().getBytes(), CREATE, WRITE, TRUNCATE_EXISTING
 
-// Write new build number.
-Files.write(buildNumberPath, buildNumber.toString().getBytes(), CREATE, WRITE)
+// Group and version.
+String projectVersion = baseVersion + '.' + buildNumber + (versionSuffix == "none" ? "" : "-" + versionSuffix)
+String projectGroup = "com.ultreon"
+group projectGroup
+version projectVersion
 
-group 'com.ultreon'
-version baseVersion + '.' + buildNumber + "-" + versionSuffix
-archivesBaseName = "$projectName"
+// Base name.
+archivesBaseName = "$projectId"
 
-println("Version: " + version)
-
+// Compat
 sourceCompatibility = targetCompatibility = 1.8
-
-compileJava {
-    sourceCompatibility "1.8"
-    targetCompatibility "1.8"
-}
 
 publishing {
     repositories {
-
+        maven {
+            name "MavenLocalUltreon"
+            url project.property("localMaven")
+        }
     }
 
     dependencies {
@@ -62,74 +64,98 @@ publishing {
     publications {
         //noinspection GroovyAssignabilityCheck
         gpr(MavenPublication) {
-            from(components.java)
+            //noinspection GroovyAssignabilityCheck
+            from components.java
         }
     }
 }
 
+// Configure java compilation.
+compileJava {
+    // Compatibility.
+    sourceCompatibility "1.8"
+    targetCompatibility "1.8"
+
+    // Java toolchain version.
+    javaToolchains {
+        version "1.8"
+    }
+
+    options.fork = true
+}
+
+// Configure how resources are being processed.
+processResources {
+    duplicatesStrategy DuplicatesStrategy.INCLUDE
+}
+
+// Dependency repositories. For the project.
 repositories {
+    // Include local maven, why not?
     mavenLocal()
 
+    // Recommended repos.
     google()
     mavenCentral()
 }
 
+// Dependency configurations.
 configurations {
-    // configuration that holds jars to include in the jar
     api {
         canBeResolved true
     }
 }
 
+// Dependencies.
+// Use api '<<project>>' for dependencies that needs to be includes in final jar.
+// Use implementation '<<project>>' for dependencies that are only on compile time.
 dependencies {
+    // Required implementation.
     implementation 'org.jetbrains:annotations:22.0.0'
+
+    // Other
+    // {...}
 }
 
-// Example for how to get properties into the manifest for reading by the runtime..
+// Jar configuration.
 jar {
+    // Manifest
+    //noinspection GroovyAssignabilityCheck
     manifest {
         attributes([
-                "Specification-Title": "Ultreon Commons",
-                "Specification-Vendor": "Ultreon Team",
-                "Specification-Version": project.version,
-                "Implementation-Title": project.name,
-                "Implementation-Version": "${version}",
-                "Implementation-Vendor" :"Ultreon Team",
+                // Specifications
+                "Specification-Title"     : projectName,
+                "Specification-Vendor"    : teamName,
+                "Specification-Version"   : projectVersion,
+
+                // Implementations
+                "Implementation-Title"    : projectId,
+                "Implementation-Vendor"   : teamName,
+                "Implementation-Version"  : projectVersion,
                 "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
         ])
     }
+
+    // Collect the api dependencies, and include them in jar.
     from {
         configurations.api.collect { it.isDirectory() ? it : zipTree(it) }
     }
+
+    // Include duplicates
+    duplicatesStrategy DuplicatesStrategy.INCLUDE
 }
 
-task("uploadJars", dependsOn: "build") {
-    description = "uploads JARs"
-
-    if (project.hasProperty("local_maven") || project.hasProperty("sftp_maven")) {
-        apply plugin: 'maven'
-        uploadArchives {
-            repositories {
-                if (project.hasProperty("local_maven")) {
-                    //noinspection GrUnresolvedAccess
-                    mavenDeployer {
-                        //noinspection GrUnresolvedAccess
-                        repository(url: "file://${local_maven}")
-                    }
-                }
-                if (project.hasProperty("sftp_maven")) {
-                    repositories.mavenDeployer {
-                        configuration = configurations.deployerJars
-                        //noinspection GrUnresolvedAccess
-                        repository(url: "sftp://${sftp_maven}") {
-                            //noinspection GrUnresolvedAccess
-                            authentication(userName: "${sftp_username}", privateKey: "${sftp_key}")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-jar.finalizedBy('uploadJars')
+// Log some information.
+println "Project: ~"
+println "  ID     : $projectId"
+println "  Name   : $projectName"
+println "  Group  : $projectGroup"
+println "  Version: $projectVersion"
+println "Compile: ~"
+println "  Java: ~"
+println "    Version: ${JavaVersion.current().toString()}"
+println "    Source : ${compileJava.sourceCompatibility}"
+println "    Target : ${compileJava.targetCompatibility}"
+println "    Is Fork: ${compileJava.options.isFork()}"
+println "Gradle: ~"
+println "  Version: $project.gradle.gradleVersion"
