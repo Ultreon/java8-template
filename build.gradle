@@ -1,47 +1,12 @@
 //file:noinspection GroovyUnusedCatchParameter
-
-import java.nio.file.Files
-import java.nio.file.Paths
-
-import static java.nio.file.StandardOpenOption.*
-
 apply plugin: 'java'
 apply plugin: 'java-library'
 apply plugin: 'eclipse'
 apply plugin: 'maven-publish'
 
-// Receive properties and make variables of them.
-String baseVersion = project.property("baseVersion").toString()
-String versionSuffix = project.property("versionSuffix").toString()
-String projectId = project.property("projectId").toString()
-String projectName = project.property("projectName").toString()
-String teamName = project.property("teamName").toString()
-
-// Check project id.
-if (projectId == "<<INSTERT_PROJECT_NAME>>") {
-    println "Set the project name before running project."
-    System.exit(0)
-}
-
-// Project build numbering
-final buildNumberPath = Paths.get project.projectDir.absolutePath, "buildnumber.txt"
-int buildNumber
-
-try {
-    buildNumber = Integer.valueOf new String(Files.readAllBytes(buildNumberPath))
-} catch (Throwable t) {
-    buildNumber = -1
-}
-
-buildNumber++
-println "New buildnumber: " + buildNumber
-Files.write buildNumberPath, buildNumber.toString().getBytes(), CREATE, WRITE, TRUNCATE_EXISTING
-
 // Group and version.
-String projectVersion = baseVersion + '.' + buildNumber + (versionSuffix == "none" ? "" : "-" + versionSuffix)
-String projectGroup = "com.ultreon"
-group projectGroup
-version projectVersion
+group property("projectGroup")
+version property("projectVersion")
 
 // Base name.
 archivesBaseName = "$projectId"
@@ -51,14 +16,7 @@ sourceCompatibility = targetCompatibility = 1.8
 
 publishing {
     repositories {
-        maven {
-            name "MavenLocalUltreon"
-            url project.property("localMaven")
-        }
-    }
-
-    dependencies {
-
+        mavenLocal()
     }
 
     publications {
