@@ -1,8 +1,10 @@
-//file:noinspection GroovyUnusedCatchParameter
-apply plugin: 'java'
-apply plugin: 'java-library'
-apply plugin: 'eclipse'
-apply plugin: 'maven-publish'
+plugins {
+    id 'java'
+    id 'java-library'
+    id 'idea'
+    id 'eclipse'
+    id 'maven-publish'
+}
 
 // Group and version.
 group property("projectGroup")
